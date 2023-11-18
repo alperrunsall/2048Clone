@@ -25,7 +25,6 @@ public class CubeController : MonoBehaviour
     private Cube matchCube = null, m_cubeComp = null;
     RaycastHit hit;
 
-    //Oyun baþlamadan önce hareket pozisyonlarý belirlenir.
     private void Awake()
     {
         source = GetComponent<AudioSource>();
@@ -34,6 +33,7 @@ public class CubeController : MonoBehaviour
         GetHighScore();
     }
 
+    //Oyun baþlamadan önce hareket pozisyonlarý belirlenir.
     private void SetSpawnPoints()
     {
         spawnPoints.Clear();
@@ -57,7 +57,6 @@ public class CubeController : MonoBehaviour
                 Transform planeClone = Instantiate(plane, point, Quaternion.identity).transform;
                 planeClone.parent = planeParent;
             }
-
         }
 
         isPlanesSpawned = true;
@@ -71,9 +70,11 @@ public class CubeController : MonoBehaviour
             RestartGame();
 
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-        if (!isGameOver) {
+
+        if (!isGameOver) { // Oyun kaybedildiyse tüm kontrol kýsýtlanýyor
             if (Physics.Raycast(ray, out hit, Mathf.Infinity))
             {
+                // Týklayarak küp belirleniyor
                 if (Input.GetMouseButtonDown(0))
                 {
                     if (hit.collider.tag == "Cube")
@@ -93,6 +94,7 @@ public class CubeController : MonoBehaviour
                     Vector3 finalVector = new Vector3(Mathf.RoundToInt(hit.point.x), 0, Mathf.RoundToInt(hit.point.z));
                     float abs = Mathf.Abs((firstPos - finalVector).x) + Mathf.Abs((firstPos - finalVector).z);
 
+                    //Küp 4x4'lük birimler içindeyse
                     if (Mathf.RoundToInt(hit.point.x) < 2f && Mathf.RoundToInt(hit.point.x) > -3f
                     && Mathf.RoundToInt(hit.point.z) < 2f && Mathf.RoundToInt(hit.point.z) > -3f
                     && abs <= 2)
@@ -100,6 +102,7 @@ public class CubeController : MonoBehaviour
                         Cube myCube = m_cube.GetComponent<Cube>();
                         int checkCubes = 0;
 
+                        // Kontrol edilen küp, sahnedeki diðer küplerin pozisyonuyla çakýþýyor mu 
                         for (int i = 0; i < cubes.Count; i++)
                         {
                             if (cubes[i] != m_cube)
@@ -115,6 +118,7 @@ public class CubeController : MonoBehaviour
                         }
 
                         if (matchCube != null)
+                        {
                             if (checkCubes == cubes.Count - 1)
                             {
                                 if (matchCube.GetAnimState() == 1)
@@ -127,28 +131,28 @@ public class CubeController : MonoBehaviour
 
                                 StartCoroutine(matchCube.HoverCor(matchCube.gameObject, 0));
                                 matchCube = null;
+                                return;
                             }
-
-                        if (matchCube == null)
-                        {
-                            m_cube.transform.position = finalVector;
-                            isMatched = false;
-                        }
-                        else
-                        {
+                            
                             // 2 Küp eþlenebilirse ama henüz fare býrakýlmadýysa
                             if (matchCube.value == myCube.value)
                             {
+                                StartCoroutine(matchCube.HoverCor(matchCube.gameObject, 1));
+                                source.PlayOneShot(matchHoverAUD);
+
                                 matchCube.SetAnimState(1);
                                 matchCube.value = matchCube.value * 2;
                                 matchCube.text.text = "" + matchCube.value;
-                                source.PlayOneShot(matchHoverAUD);
-                                StartCoroutine(matchCube.HoverCor(matchCube.gameObject, 1));
+
                                 m_cube.transform.position = finalVector;
                                 m_cube.SetActive(false);
-                                UpdateScore(matchCube.value);
                                 isMatched = true;
                             }
+                        }
+                        else
+                        {
+                            m_cube.transform.position = finalVector;
+                            isMatched = false;
                         }
                     }
                 }
@@ -174,6 +178,7 @@ public class CubeController : MonoBehaviour
                                 StartCoroutine(matchCube.HoverCor(matchCube.gameObject, 0));
                                 setCubeChanges(matchCube);
                                 spawnPoints.Add(firstPos);
+                                UpdateScore(matchCube.value);
                                 cubes.Remove(m_cube);
                                 matchCube = null;
                                 Destroy(m_cube);
@@ -183,10 +188,12 @@ public class CubeController : MonoBehaviour
                         }
                         else
                             StartCoroutine(m_cubeComp.HoverCor(m_cube, 0));
+
                         m_cubeComp = null;
                         m_cube = null;
                     }
 
+                    // Küp býrakýldýktan sonra renkler eski haline geliyor
                     for (int i = 0; i < planeParent.childCount; i++)
                         planeParent.GetChild(i).GetComponent<Renderer>().material.color = planeColor;
                     for (int i = 0; i < cubes.Count; i++)
@@ -225,16 +232,18 @@ public class CubeController : MonoBehaviour
     {
         for (int i = 0; i < planeParent.childCount; i++)
         {
+            // Plane pozisyonlarý ve küpün baþlangýç pozisyonu arasýndaki x ve z eksenlerinin farkýnýn kaç birim olduðu hesaplanýyor
             float abs = Mathf.Abs((firstPos - planeParent.GetChild(i).position).x) + Mathf.Abs((firstPos - planeParent.GetChild(i).position).z);
+            // Küpün deðerine göre alabileceði 2 farklý Color.lerp hesabý yapýlýyor
             Color color = m_cubeComp.value < 150 ? Color.Lerp(colorStart100, colorEnd100, m_cubeComp.value / 100f) : Color.Lerp(colorEnd100, colorEnd1000, m_cubeComp.value / 1000f);
 
             if (abs <= 2)
                 planeParent.GetChild(i).GetComponent<Renderer>().material.color = color;
-
             else
                 planeParent.GetChild(i).GetComponent<Renderer>().material.color = Color.gray;
         }
 
+        // Tüm küplerin pozisyonlarý ve kontrol edilen küpün pozisyonu arasýndaki fark hesaplanarak hangi küplere gidilebileceði anlaþýlýyor
         for (int i = 0; i < cubes.Count; i++)
         {
             float abs = Mathf.Abs((firstPos - cubes[i].transform.position).x) + Mathf.Abs((firstPos - cubes[i].transform.position).z);
@@ -259,8 +268,6 @@ public class CubeController : MonoBehaviour
             setCubeChanges(newCube);
             spawnPoints.RemoveAt(random);
             cubes.Add(newCube.gameObject);
-
-            //newCube.transform.parent = cubeParent;
         }
         else
         {
@@ -268,7 +275,6 @@ public class CubeController : MonoBehaviour
             scoreTXT.transform.parent.gameObject.SetActive(false);
             gameOverText.SetActive(true);
             isGameOver = true;
-
         }
     }
 
@@ -287,7 +293,6 @@ public class CubeController : MonoBehaviour
         cubes.Clear();
         SetSpawnPoints();
         SpawnCubes();
-
     }
 
     //Küpler birleþtiklerinde rengi ve yazý deðeri deðiþir.
@@ -308,6 +313,7 @@ public class CubeController : MonoBehaviour
         PlayerPrefs.SetInt("high_score", value);
         GetHighScore();
     }
+
     private int GetHighScore() {
         int val = PlayerPrefs.GetInt("high_score");
         highScoreTXT.text = "High Score: " + val;
